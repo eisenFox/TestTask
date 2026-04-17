@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.XR;
 
 public class PlayerController : MonoBehaviour
 {
@@ -23,6 +24,11 @@ public class PlayerController : MonoBehaviour
     private float cameraPitch;
     private Vector3 velocity;
 
+    bool IsVRActive()
+    {
+        return XRSettings.isDeviceActive;
+    }
+
     void Awake()
     {
         controller = GetComponent<CharacterController>();
@@ -32,13 +38,18 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        Look();
+
+        if (!IsVRActive())
+        {
+            Look();
+        }
         Move();
         Interact();
     }
 
     void Look()
     {
+
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
@@ -51,8 +62,18 @@ public class PlayerController : MonoBehaviour
 
     void Move()
     {
-        float x = Input.GetAxisRaw("Horizontal");
-        float z = Input.GetAxisRaw("Vertical");
+        float x, z;
+
+        if (IsVRActive())
+        {
+            x = Input.GetAxis("Oculus_CrossPlatform_PrimaryThumbstickHorizontal");
+            z = Input.GetAxis("Oculus_CrossPlatform_PrimaryThumbstickVertical");
+        }
+        else
+        {
+            x = Input.GetAxisRaw("Horizontal");
+            z = Input.GetAxisRaw("Vertical");
+        }
 
         Vector3 move = (transform.right * x + transform.forward * z).normalized;
         controller.Move(move * moveSpeed * Time.deltaTime);
@@ -65,12 +86,42 @@ public class PlayerController : MonoBehaviour
     }
     void Interact()
     {
-        Ray ray = playerCamera.GetComponent<Camera>()
-            .ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        Ray ray;
+        if (IsVRActive())
+        {
+            ray = new Ray(playerCamera.position, playerCamera.forward);
+        }
+        else
+        {
+            ray = playerCamera.GetComponent<Camera>()
+                .ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        }
 
         RaycastHit hit;
+        
+        bool interactPressed = false;
+        bool interactReleased = false;
+
+        if (IsVRActive())
+        {
+            float trigger = Input.GetAxis("Oculus_CrossPlatform_Trigger");
+
+            interactPressed = trigger > 0.8f;
+            interactReleased = trigger <= 0.2f;
+        }
+        else
+        {
+            interactPressed = Input.GetMouseButtonDown(0);
+            interactReleased = Input.GetMouseButtonUp(0);
+        }
+        
+        
         // Picking up object and Interacting with them
-        if (Input.GetMouseButtonDown(0))
+        
+        
+        
+        
+        if (interactPressed)
         {
             if (Physics.Raycast(ray, out hit, interactDistance))
             {
@@ -103,7 +154,7 @@ public class PlayerController : MonoBehaviour
             }
         }
         // Throwing object
-        if (Input.GetMouseButtonUp(0))
+        if (interactReleased)
         {
             if (currentRb != null)
             {
